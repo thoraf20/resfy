@@ -4,68 +4,59 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"gorm.io/gorm"
 )
 
 type TaskService struct {
-	tasks map[string]Task
+	db *gorm.DB
 }
 
-func NewTaskService() *TaskService {
-	return &TaskService{
-		tasks: make(map[string]Task),
-	}
+func NewTaskService(db *gorm.DB) *TaskService {
+	db.AutoMigrate(&Task{})
+	return &TaskService{db: db}
 }
 
 func (s *TaskService) Create(title, description string, dueDate time.Time) Task {
-	id := uuid.New().String()
 	task := Task{
-		ID:          id,
+		ID:          uuid.NewString(),
 		Title:       title,
 		Description: description,
 		DueDate:     dueDate,
-		Completed:   false,
-		CreatedAt:   time.Now(),
 	}
-	s.tasks[id] = task
+	s.db.Create(&task)
 	return task
 }
 
 func (s *TaskService) GetAll() []Task {
-	tasks := []Task{}
-	for _, t := range s.tasks {
-		tasks = append(tasks, t)
-	}
+	var tasks []Task
+	s.db.Order("created_at desc").Find(&tasks)
 	return tasks
 }
 
 func (s *TaskService) MarkAsCompleted(id string) (Task, bool) {
-	task, ok := s.tasks[id]
-	if !ok {
+	var task Task
+	if err := s.db.First(&task, "id = ?", id).Error; 
+	err != nil {
 		return Task{}, false
 	}
 	task.Completed = true
-	s.tasks[id] = task
+	s.db.Save(&task)
 	return task, true
 }
 
-func (s *TaskService) Update(id string, title, description string, dueDate time.Time) (Task, bool) {
-	task, ok := s.tasks[id]
-	if !ok {
+func (s *TaskService) Update(id, title, description string, dueDate time.Time) (Task, bool) {
+	var task Task
+	if err := s.db.First(&task, "id = ?", id).Error; err != nil {
 		return Task{}, false
 	}
 	task.Title = title
 	task.Description = description
 	task.DueDate = dueDate
-	s.tasks[id] = task
+	s.db.Save(&task)
 	return task, true
 }
 
 func (s *TaskService) Delete(id string) bool {
-	if _, exists := s.tasks[id]; 
-	!exists {
-		return false
-	}
-	delete(s.tasks, id)
-	return true
+	result := s.db.Delete(&Task{}, "id = ?", id)
+	return result.RowsAffected > 0
 }
-

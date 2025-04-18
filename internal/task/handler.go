@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/hibiken/asynq"
+	"github.com/thoraf20/resfy/internal/worker"
 )
 
 type Handler struct {
@@ -36,6 +38,10 @@ func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	task := h.Service.Create(body.Title, body.Description, dueDate)
+
+	// Schedule task reminder
+	distributor := worker.NewTaskDistributor(asynq.RedisClientOpt{Addr: "localhost:6379"})
+	_ = distributor.ScheduleReminder(task.ID, task.DueDate)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(task)

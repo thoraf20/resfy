@@ -3,10 +3,11 @@ package task
 import "time"
 
 type Task struct {
-	ID          string    `json:"id"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	DueDate     time.Time `json:"due_date"`
-	Completed   bool      `json:"completed"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          string    `gorm:"primaryKey"`
+	Title       string
+	Description string
+	Completed   bool
+	DueDate     time.Time
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 }
