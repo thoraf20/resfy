@@ -2,13 +2,30 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/hibiken/asynq"
 	"github.com/thoraf20/resfy/internal/task"
+	"github.com/thoraf20/resfy/internal/worker"
 )
 
 func main() {
+
+	redisOpt := asynq.RedisClientOpt{Addr: "localhost:6379"}
+
+	taskProcessor := worker.NewTaskProcessor()
+	srv := asynq.NewServer(redisOpt, asynq.Config{Concurrency: 10})
+	mux := asynq.NewServeMux()
+	mux.HandleFunc(worker.TaskSendReminder, taskProcessor.HandleReminderTask)
+
+	go func() {
+		if err := srv.Run(mux); err != nil {
+			log.Fatalf("Could not run asynq server: %v", err)
+		}
+	}()
+
 	r := chi.NewRouter()
 
 	// Task setup
