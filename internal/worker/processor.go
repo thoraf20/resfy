@@ -1,3 +1,5 @@
+// internal/worker/processor.go
+
 package worker
 
 import (
@@ -8,21 +10,22 @@ import (
 	"github.com/hibiken/asynq"
 )
 
-type TaskProcessor struct{}
-
-func NewTaskProcessor() *TaskProcessor {
-	return &TaskProcessor{}
+func NewTaskProcessor() *asynq.Server {
+	return asynq.NewServer(
+		asynq.RedisClientOpt{Addr: "localhost:6379"},
+		asynq.Config{
+			Concurrency: 10,
+		},
+	)
 }
 
-func (p *TaskProcessor) HandleReminderTask(ctx context.Context, t *asynq.Task) error {
-	var payload PayloadSendReminder
-	if err := json.Unmarshal(t.Payload(), &payload); 
-	err != nil {
+func HandleReminderTask(ctx context.Context, t *asynq.Task) error {
+	var p PayloadSendReminder
+	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return err
 	}
 
-	// TODO: send reminder logic (log, email, notification, etc.)
-	fmt.Printf("⏰ Reminder: Task %s is due soon!\n", payload.TaskID)
-
+	// TODO: send email/notification here
+	fmt.Printf("📬 Reminder: Task %s is due soon!\n", p.TaskID)
 	return nil
 }

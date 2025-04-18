@@ -1,31 +1,30 @@
 package worker
 
 import (
-	"encoding/json"
 	"time"
-
 	"github.com/hibiken/asynq"
+	// "github.com/thoraf20/resfy/internal/worker/"
 )
 
 type TaskDistributor struct {
 	client *asynq.Client
 }
 
-func NewTaskDistributor(redisOpt asynq.RedisClientOpt) *TaskDistributor {
+func NewTaskDistributor(redisOpts asynq.RedisClientOpt) *TaskDistributor {
 	return &TaskDistributor{
-		client: asynq.NewClient(redisOpt),
+		client: asynq.NewClient(redisOpts),
 	}
 }
 
-func (d *TaskDistributor) ScheduleReminder(taskID string, when time.Time) error {
-	payload, err := json.Marshal(PayloadSendReminder{TaskID: taskID})
-	if err != nil {
-		return err
+func (d *TaskDistributor) ScheduleReminder(taskID string, dueDate time.Time, offset time.Duration) error {
+	reminderTime := dueDate.Add(-offset)
+	if reminderTime.Before(time.Now()) {
+		return nil // too late to schedule
 	}
 
-	task := asynq.NewTask(TaskSendReminder, payload)
+	payload := &payload.PayloadSendReminder{TaskID: taskID}
+	task := asynq.NewTask("send:reminder", payload.Marshal())
 
-	// Schedule the task to run 30 minutes before due date
-	_, err = d.client.Enqueue(task, asynq.ProcessAt(when.Add(-30*time.Minute)))
+	_, err := d.client.Enqueue(task, asynq.ProcessAt(reminderTime))
 	return err
 }

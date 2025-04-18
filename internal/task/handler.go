@@ -3,63 +3,72 @@ package task
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/hibiken/asynq"
-	"github.com/thoraf20/resfy/internal/worker"
+	// "github.com/hibiken/asynq"
+	"github.com/thoraf20/resfy/internal/utils"
+	// "github.com/thoraf20/resfy/internal/worker"
 )
 
 type Handler struct {
-	Service     *TaskService // Updated to use GORM-based Service
-	Distributor *worker.TaskDistributor
+	Service *TaskService
 }
 
 func NewHandler(service *TaskService) *Handler {
-	return &Handler{
-		Service:     service,
-		Distributor: worker.NewTaskDistributor(asynq.RedisClientOpt{Addr: "localhost:6379"}),
-	}
+	return &Handler{Service: service}
 }
 
 func (h *Handler) CreateTask(w http.ResponseWriter, r *http.Request) {
 	var body struct {
+		UserID      string `json:"user_id"`
 		Title       string `json:"title"`
 		Description string `json:"description"`
-		DueDate     string `json:"due_date"` // as ISO string
+		DueDate     string `json:"due_date"`
 	}
-
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		utils.Error(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	userID := r.Context().Value("userID").(string)
-
-	task, err := h.Service.Create(userID, body.Title, body.Description, body.DueDate)
+	dueDate, err := time.Parse(time.RFC3339, body.DueDate)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		utils.Error(w, http.StatusBadRequest, "Invalid due_date format")
 		return
 	}
 
-	// Schedule reminder
-	_ = h.Distributor.ScheduleReminder(task.ID, task.DueDate)
+	task, err := h.Service.Create(body.Title, body.Description, body.UserID, dueDate.Local().String())
+	if err != nil {
+		utils.Error(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(task)
+	// Schedule task reminder
+	// distributor := worker.NewTaskDistributor(asynq.RedisClientOpt{Addr: "localhost:6379"})
+	// _ = distributor.ScheduleReminder(task.ID, task.DueDate)
+
+	utils.JSON(w, http.StatusCreated, task)
 }
 
 func (h *Handler) GetTasks(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("userID").(string)
-
 	tasks, err := h.Service.GetAllByUser(userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		utils.Error(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tasks)
+	utils.JSON(w, http.StatusOK, tasks)
 }
+
+// func (h *Handler) MarkTaskComplete(w http.ResponseWriter, r *http.Request) {
+// 	id := chi.URLParam(r, "id")
+// 	task, ok := h.Service.MarkAsCompleted(id)
+// 	if !ok {
+// 		utils.Error(w, http.StatusNotFound, "Task not found")
+// 		return
+// 	}
+// 	utils.JSON(w, http.StatusOK, task)
+// }
 
 func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
@@ -71,20 +80,23 @@ func (h *Handler) UpdateTask(w http.ResponseWriter, r *http.Request) {
 		DueDate     string `json:"due_date"`
 		Completed   bool   `json:"completed"`
 	}
-
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		utils.Error(w, http.StatusBadRequest, "Invalid request body")
 		return
 	}
 
-	task, err := h.Service.Update(userID, id, body.Title, body.Description, body.DueDate, body.Completed)
+	dueDate, err := time.Parse(time.RFC3339, body.DueDate)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		utils.Error(w, http.StatusBadRequest, "Invalid due_date format")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(task)
+	task, err := h.Service.Update(userID, id, body.Title, body.Description, dueDate.Local().String(), body.Completed)
+	if err != nil {
+		utils.Error(w, http.StatusNotFound, "Task not found")
+		return
+	}
+	utils.JSON(w, http.StatusOK, task)
 }
 
 func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request) {
@@ -93,9 +105,8 @@ func (h *Handler) DeleteTask(w http.ResponseWriter, r *http.Request) {
 
 	err := h.Service.Delete(userID, id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		utils.Error(w, http.StatusNotFound, "Task not found")
 		return
 	}
-
-	w.WriteHeader(http.StatusNoContent)
+	utils.JSON(w, http.StatusOK, map[string]string{"message": "Task deleted"})
 }
