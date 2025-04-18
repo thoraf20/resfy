@@ -47,3 +47,25 @@ func (s *TaskService) MarkAsCompleted(id string) (Task, bool) {
 	s.tasks[id] = task
 	return task, true
 }
+
+func (s *TaskService) Update(id string, title, description string, dueDate time.Time) (Task, bool) {
+	task, ok := s.tasks[id]
+	if !ok {
+		return Task{}, false
+	}
+	task.Title = title
+	task.Description = description
+	task.DueDate = dueDate
+	s.tasks[id] = task
+	return task, true
+}
+
+func (s *TaskService) Delete(id string) bool {
+	if _, exists := s.tasks[id]; 
+	!exists {
+		return false
+	}
+	delete(s.tasks, id)
+	return true
+}
+
