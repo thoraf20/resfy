@@ -12,51 +12,61 @@ type TaskService struct {
 }
 
 func NewTaskService(db *gorm.DB) *TaskService {
-	db.AutoMigrate(&Task{})
 	return &TaskService{db: db}
 }
 
-func (s *TaskService) Create(title, description string, dueDate time.Time) Task {
-	task := Task{
-		ID:          uuid.NewString(),
+func (s *TaskService) Create(userID, title, description, dueDate string) (*Task, error) {
+	parsedDueDate, err := time.Parse(time.RFC3339, dueDate)
+	if err != nil {
+		return nil, err
+	}
+
+	task := &Task{
+		ID:          uuid.New().String(),
 		Title:       title,
 		Description: description,
-		DueDate:     dueDate,
+		DueDate:     parsedDueDate,
+		Completed:   false,
+		UserID:      userID,
 	}
-	s.db.Create(&task)
-	return task
+
+	if err := s.db.Create(task).Error; err != nil {
+		return nil, err
+	}
+	return task, nil
 }
 
-func (s *TaskService) GetAll() []Task {
+func (s *TaskService) GetAllByUser(userID string) ([]Task, error) {
 	var tasks []Task
-	s.db.Order("created_at desc").Find(&tasks)
-	return tasks
+	if err := s.db.Where("user_id = ?", userID).Find(&tasks).Error; err != nil {
+		return nil, err
+	}
+	return tasks, nil
 }
 
-func (s *TaskService) MarkAsCompleted(id string) (Task, bool) {
+func (s *TaskService) Update(userID, taskID, title, description, dueDate string, completed bool) (*Task, error) {
 	var task Task
-	if err := s.db.First(&task, "id = ?", id).Error; 
-	err != nil {
-		return Task{}, false
+	if err := s.db.First(&task, "id = ? AND user_id = ?", taskID, userID).Error; err != nil {
+		return nil, err
 	}
-	task.Completed = true
-	s.db.Save(&task)
-	return task, true
-}
 
-func (s *TaskService) Update(id, title, description string, dueDate time.Time) (Task, bool) {
-	var task Task
-	if err := s.db.First(&task, "id = ?", id).Error; err != nil {
-		return Task{}, false
+	parsedDueDate, err := time.Parse(time.RFC3339, dueDate)
+	if err != nil {
+		return nil, err
 	}
+
 	task.Title = title
 	task.Description = description
-	task.DueDate = dueDate
-	s.db.Save(&task)
-	return task, true
+	task.DueDate = parsedDueDate
+	task.Completed = completed
+
+	if err := s.db.Save(&task).Error; err != nil {
+		return nil, err
+	}
+
+	return &task, nil
 }
 
-func (s *TaskService) Delete(id string) bool {
-	result := s.db.Delete(&Task{}, "id = ?", id)
-	return result.RowsAffected > 0
+func (s *TaskService) Delete(userID, taskID string) error {
+	return s.db.Where("id = ? AND user_id = ?", taskID, userID).Delete(&Task{}).Error
 }

@@ -1,13 +1,16 @@
 package task
 
-import "time"
+import (
+	"time"
+)
 
 type Task struct {
-	ID          string    `gorm:"primaryKey"`
-	Title       string
-	Description string
-	Completed   bool
-	DueDate     time.Time
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID          string    `gorm:"type:uuid;primaryKey" json:"id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	DueDate     time.Time `json:"due_date"`
+	Completed   bool      `json:"completed"`
+	UserID      string    `gorm:"type:uuid" json:"user_id"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
