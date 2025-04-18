@@ -37,3 +37,13 @@ func (s *TaskService) GetAll() []Task {
 	}
 	return tasks
 }
+
+func (s *TaskService) MarkAsCompleted(id string) (Task, bool) {
+	task, ok := s.tasks[id]
+	if !ok {
+		return Task{}, false
+	}
+	task.Completed = true
+	s.tasks[id] = task
+	return task, true
+}

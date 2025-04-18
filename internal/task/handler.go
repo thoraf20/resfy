@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"time"
+
+	"github.com/go-chi/chi/v5"
 )
 
 type Handler struct {
@@ -43,4 +45,18 @@ func (h *Handler) GetTasks(w http.ResponseWriter, r *http.Request) {
 	tasks := h.Service.GetAll()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(tasks)
+}
+
+
+func (h *Handler) MarkTaskComplete(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	task, ok := h.Service.MarkAsCompleted(id)
+	if !ok {
+		http.Error(w, "Task not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(task)
 }

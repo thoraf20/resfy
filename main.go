@@ -22,6 +22,7 @@ func main() {
 	r.Route("/tasks", func(r chi.Router) {
 		r.Post("/", taskHandler.CreateTask)
 		r.Get("/", taskHandler.GetTasks)
+		r.Put("/{id}/complete", taskHandler.MarkTaskComplete)
 	})
 
 	fmt.Println("Server running at :8080")
